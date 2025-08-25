@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environment
+venv/
+env/
+.venv/
+.env/
+
+# PyCharm
+.idea/
+*.iml
+
+# Byte-compiled / distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
