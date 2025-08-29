@@ -25,25 +25,21 @@ class HypProxyAnchor(nn.Module):
 
 
     def forward(self, X, T):
+
         P = self.projector(self.proxies_tan)
+
         dist_mat = pmath.dist_matrix(X, P, c=self.c)
-
-        sim = torch.exp(-self.alpha * (dist_mat - self.mrg))
-
 
         P_one_hot = torch.nn.functional.one_hot(T, num_classes=self.nb_classes).float()
         N_one_hot = 1 - P_one_hot
 
-        with_pos_proxies = torch.nonzero(P_one_hot.sum(dim=0) != 0).squeeze(dim=1)
-        num_valid_proxies = len(with_pos_proxies)
+        pos_term = torch.where(P_one_hot == 1, torch.log1p(torch.exp(dist_mat)), torch.zeros_like(dist_mat))
+        pos_term = pos_term.sum(dim=0) / (P_one_hot.sum(dim=0) + 1e-8)  # media su proxy validi
 
-        P_sim_sum = torch.where(P_one_hot == 1, sim, torch.zeros_like(sim)).sum(dim=0)
-        N_sim_sum = torch.where(N_one_hot == 1, sim, torch.zeros_like(sim)).sum(dim=0)
+        neg_term = torch.where(N_one_hot == 1, torch.log1p(torch.exp(-dist_mat)), torch.zeros_like(dist_mat))
+        neg_term = neg_term.sum(dim=0) / self.nb_classes
 
-        pos_term = torch.log(1 + P_sim_sum).sum() / num_valid_proxies
-        neg_term = torch.log(1 + N_sim_sum).sum() / self.nb_classes
-
-        loss = pos_term + neg_term
+        loss = pos_term.sum() + neg_term.sum()
         return loss
 
     def get_proxies(self):
