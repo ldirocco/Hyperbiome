@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import poincare_math as pmath
+import src.poincare_math as pmath
 
 from modules import HypProjector
 
@@ -25,21 +25,35 @@ class HypProxyAnchor(nn.Module):
 
 
     def forward(self, X, T):
+        # Proxies
+        P = self.projector(self.proxies_tan)  # mantiene la logica attuale
 
-        P = self.projector(self.proxies_tan)
+        # Calcolo della matrice di distanza iperbolica
+        dist_mat = pmath.dist_matrix(X, P, c=self.c)  # distanza iperbolica
 
-        dist_mat = pmath.dist_matrix(X, P, c=self.c)
-
+        # One-hot encoding dei target
         P_one_hot = torch.nn.functional.one_hot(T, num_classes=self.nb_classes).float()
         N_one_hot = 1 - P_one_hot
 
-        pos_term = torch.where(P_one_hot == 1, torch.log1p(torch.exp(dist_mat)), torch.zeros_like(dist_mat))
-        pos_term = pos_term.sum(dim=0) / (P_one_hot.sum(dim=0) + 1e-8)  # media su proxy validi
+        # Selezione dei proxy positivi validi
+        with_pos_proxies = torch.nonzero(P_one_hot.sum(dim=0) != 0).squeeze(dim=1)
+        num_valid_proxies = len(with_pos_proxies)
 
-        neg_term = torch.where(N_one_hot == 1, torch.log1p(torch.exp(-dist_mat)), torch.zeros_like(dist_mat))
-        neg_term = neg_term.sum(dim=0) / self.nb_classes
+        pos_term = 0.0
 
-        loss = pos_term.sum() + neg_term.sum()
+        for p in with_pos_proxies:
+            x_pos = P_one_hot[:, p].bool()
+            pos_term += torch.log1p(torch.exp(dist_mat[x_pos, p])).sum()
+        pos_term /= num_valid_proxies
+
+        neg_term = 0.0
+        for p in range(self.nb_classes):
+            x_neg = N_one_hot[:, p].bool()
+            neg_term += torch.log1p(torch.exp(-dist_mat[x_neg, p])).sum()
+        neg_term /= self.nb_classes
+
+        loss = pos_term + neg_term
+
         return loss
 
     def get_proxies(self):

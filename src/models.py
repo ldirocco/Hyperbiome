@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from modules import HypProjector
+from src.modules import HypProjector
 
 class TransformerEmbedder(nn.Module):
 
