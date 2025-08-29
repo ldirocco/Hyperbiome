@@ -1,13 +1,15 @@
 import torch
 import torch.nn as nn
 
-
+from modules import HypProjector
 
 class TransformerEmbedder(nn.Module):
+
     def __init__(self, input_dim=4096, patch_size=16, dim=128, depth=4, heads=4, mlp_dim=256):
         super().__init__()
 
         assert input_dim % patch_size == 0, "Input dimension must be divisible by patch size"
+
         self.num_patches = input_dim // patch_size
         self.patch_embed = nn.Linear(patch_size, dim)
 
@@ -32,4 +34,22 @@ class TransformerEmbedder(nn.Module):
         x = self.transformer(x)  # (B, 1 + num_patches, dim)
         x = self.to_cls_token(x[:, 0])  # Use CLS token
 
+        return x
+
+class HypTransformerEmbedder(nn.Module):
+    def __init__(self, input_dim=4096, patch_size=16, dim=128, depth=4, heads=4, mlp_dim=256, c=1.0):
+        super().__init__()
+        self.embedder = TransformerEmbedder(
+            input_dim=input_dim,
+            patch_size=patch_size,
+            dim=dim,
+            depth=depth,
+            heads=heads,
+            mlp_dim=mlp_dim,
+        )
+        self.projector = HypProjector(c=c, riemannian=True, clip_r=2.3)
+
+    def forward(self, x):
+        x = self.embedder(x)
+        x = self.projector(x)
         return x
