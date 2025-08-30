@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import src.poincare_math as pmath
 
-from modules import HypProjector
+from src.modules import HypProjector
 
 # Appunti by Ciro:
 #1. I proxy sono ottimizzati nello spazio tangente all’origine e poi mappati sulla palla con expmap0 durante il forward.
