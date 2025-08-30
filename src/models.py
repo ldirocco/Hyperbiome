@@ -37,7 +37,7 @@ class TransformerEmbedder(nn.Module):
         return x
 
 class HypTransformerEmbedder(nn.Module):
-    def __init__(self, input_dim=4096, patch_size=16, dim=128, depth=4, heads=4, mlp_dim=256, c=1.0):
+    def __init__(self, input_dim=4096, patch_size=16, dim=128, depth=4, heads=4, mlp_dim=256, c=0.1):
         super().__init__()
         self.embedder = TransformerEmbedder(
             input_dim=input_dim,

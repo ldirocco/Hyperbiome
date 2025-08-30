@@ -1,4 +1,3 @@
-import torch
 from torch.utils.data import DataLoader
 import os
 import argparse
@@ -39,7 +38,7 @@ def main(args):
 
     if args.hyp:
         print("Using HypProxyAnchor loss", flush=True)
-        proxy_loss_fn = HypProxyAnchor(num_classes, sz_embed=128, c=1.0, mrg=0.1, alpha=32)
+        proxy_loss_fn = HypProxyAnchor(num_classes, sz_embed=128, c=args.hyp_c, mrg=0.1, alpha=32)
     else:
         print("Using standard ProxyAnchorLoss", flush=True)
         proxy_loss_fn = ProxyAnchorLoss(num_classes, 128, margin=0.1, alpha=32)
@@ -82,6 +81,8 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--num_epochs", type=int, default=20, help="Numero di epoche per l'allenamento")
     parser.add_argument("--hyp", action='store_true', help="Se presente, usa HypTransformerEmbedder; altrimenti TransformerEmbedder")
+    parser.add_argument("--hyp_c", type=float,default=0.1, help="Curvatura")
+
 
 
     args = parser.parse_args()

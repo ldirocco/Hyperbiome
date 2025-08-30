@@ -11,7 +11,7 @@ from modules import HypProjector
 #   La formulazione stamdard usa cosine similarity. Possiamo fare lo stesso con distanza iperbolica
 
 class HypProxyAnchor(nn.Module):
-    def __init__(self, nb_classes, sz_embed, c=1.0, mrg=0.1, alpha=32, clip_r=2.3, riemannian=True):
+    def __init__(self, nb_classes, sz_embed, c=0.1, mrg=0.1, alpha=32, clip_r=2.3, riemannian=True):
         super().__init__()
         self.nb_classes = nb_classes
         self.sz_embed = sz_embed
@@ -19,8 +19,8 @@ class HypProxyAnchor(nn.Module):
         self.mrg = mrg
         self.alpha = alpha
 
-        init = torch.randn(nb_classes, sz_embed) * 0.01
-        self.proxies_tan = nn.Parameter(init)
+        proxy_init = torch.randn(nb_classes, sz_embed) * 0.01
+        self.proxies_tan = nn.Parameter(proxy_init)
         self.projector = HypProjector(c=c, riemannian=riemannian, clip_r=clip_r)
 
 
@@ -29,7 +29,7 @@ class HypProxyAnchor(nn.Module):
         P = self.projector(self.proxies_tan)  # mantiene la logica attuale
 
         # Calcolo della matrice di distanza iperbolica
-        dist_mat = pmath.dist_matrix(X, P, c=self.c)  # distanza iperbolica
+        dist_mat = pmath.dist_matrix(X, P, self.c)  # distanza iperbolica
 
         # One-hot encoding dei target
         P_one_hot = torch.nn.functional.one_hot(T, num_classes=self.nb_classes).float()
