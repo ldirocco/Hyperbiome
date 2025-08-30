@@ -26,7 +26,8 @@ class HypProxyAnchor(nn.Module):
 
     def forward(self, X, T):
         # Proxies
-        P = self.projector(self.proxies_tan)  # mantiene la logica attuale
+        device=X.device
+        P = self.projector(self.proxies_tan.to(device=device))  # mantiene la logica attuale
 
         # Calcolo della matrice di distanza iperbolica
         dist_mat = pmath.dist_matrix(X, P, self.c)  # distanza iperbolica
@@ -35,26 +36,20 @@ class HypProxyAnchor(nn.Module):
         P_one_hot = torch.nn.functional.one_hot(T, num_classes=self.nb_classes).float()
         N_one_hot = 1 - P_one_hot
 
-        # Selezione dei proxy positivi validi
-        with_pos_proxies = torch.nonzero(P_one_hot.sum(dim=0) != 0).squeeze(dim=1)
-        num_valid_proxies = len(with_pos_proxies)
+        valid_proxies_mask = (P_one_hot.sum(dim=0) != 0).float()  # [nb_classes]
+        num_valid_proxies = valid_proxies_mask.sum().clamp(min=1.0)
 
-        pos_term = 0.0
+        # Pos term: softplus(distanza) solo per coppie (x, proxy) positive
+        pos_term = torch.sum(torch.nn.functional.softplus(dist_mat) * P_one_hot) / num_valid_proxies
 
-        for p in with_pos_proxies:
-            x_pos = P_one_hot[:, p].bool()
-            pos_term += torch.log1p(torch.exp(dist_mat[x_pos, p])).sum()
-        pos_term /= num_valid_proxies
+        # --- NEGATIVE TERM ---
+        # Neg term: softplus(-distanza) per le coppie negative
+        neg_term = torch.sum(torch.nn.functional.softplus(-dist_mat) * N_one_hot) / self.nb_classes
 
-        neg_term = 0.0
-        for p in range(self.nb_classes):
-            x_neg = N_one_hot[:, p].bool()
-            neg_term += torch.log1p(torch.exp(-dist_mat[x_neg, p])).sum()
-        neg_term /= self.nb_classes
-
+        # Loss finale
         loss = pos_term + neg_term
-
         return loss
+
 
     def get_proxies(self):
         with torch.no_grad():
