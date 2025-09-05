@@ -5,6 +5,41 @@ import pandas as pd
 from pathlib import Path
 from .utils import read_file_sketch, decompress_hd_sketch
 
+class BacteriaSketches(Dataset):
+    def __init__(self, sketch_path, labels_path):
+        with open(sketch_path, 'rb') as f:
+            self.sketches = read_file_sketch(f)
+
+        self.sample = []
+        for sketch in self.sketches:
+            path = Path(sketch['file_str'])
+            file_name = path.name
+            self.sample.append(file_name[:-3])
+            labels_df=pd.read_csv(labels_path, sep='\t')
+            self.genus_labels=dict(zip(labels_df["Sample"], labels_df["Genus_ID"]))
+            self.species_labels=dict(zip(labels_df["Sample"], labels_df["Species_ID"]))
+
+    def n_genera(self):
+        return len(np.unique(np.array(list(self.genus_labels.values()))))
+
+    def n_species(self):
+        return len(np.unique(np.array(list(self.species_labels.values()))))
+
+    def __len__(self):
+        return len(self.sample)
+
+    def __getitem__(self, idx):
+        sketch = self.sketches[idx]
+        path = Path(sketch['file_str'])
+        file_name = path.name
+        sample = file_name[:-3]
+
+        hv = decompress_hd_sketch(sketch)
+        genus_id = self.genus_labels[sample]
+        species_id = self.species_labels[sample]
+
+        return torch.tensor(hv) / 255.0, torch.tensor(genus_id, dtype=torch.long), torch.tensor(species_id, dtype=torch.long)
+
 
 class SketchDataset(Dataset):
     def __init__(self, sketch_path, metadata_path, filter_path=None):
