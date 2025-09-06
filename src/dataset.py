@@ -6,7 +6,7 @@ from pathlib import Path
 from .utils import read_file_sketch, decompress_hd_sketch
 
 class BacteriaSketches(Dataset):
-    def __init__(self, sketch_path, labels_path):
+    def __init__(self, sketch_path, labels_path, return_genus=True):
         with open(sketch_path, 'rb') as f:
             self.sketches = read_file_sketch(f)
 
@@ -18,6 +18,7 @@ class BacteriaSketches(Dataset):
             labels_df=pd.read_csv(labels_path, sep='\t')
             self.genus_labels=dict(zip(labels_df["Sample"], labels_df["Genus_ID"]))
             self.species_labels=dict(zip(labels_df["Sample"], labels_df["Species_ID"]))
+            self.return_genus=return_genus
 
     def n_genera(self):
         return len(np.unique(np.array(list(self.genus_labels.values()))))
@@ -35,10 +36,15 @@ class BacteriaSketches(Dataset):
         sample = file_name[:-3]
 
         hv = decompress_hd_sketch(sketch)
-        genus_id = self.genus_labels[sample]
-        species_id = self.species_labels[sample]
+        hv = torch.tensor(hv, dtype=torch.float32) / 255.0
 
-        return torch.tensor(hv) / 255.0, torch.tensor(genus_id, dtype=torch.long), torch.tensor(species_id, dtype=torch.long)
+        species_id = torch.tensor(self.species_labels[sample], dtype=torch.long)
+
+        if self.return_genus:
+            genus_id = torch.tensor(self.genus_labels[sample], dtype=torch.long)
+            return hv, species_id, genus_id
+        else:
+            return hv, species_id
 
 
 class SketchDataset(Dataset):

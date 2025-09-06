@@ -4,6 +4,9 @@ import src.poincare_math as pmath
 
 from src.modules import HypProjector
 
+
+
+
 # Appunti by Ciro:
 #1. I proxy sono ottimizzati nello spazio tangente all’origine e poi mappati sulla palla con expmap0 durante il forward.
 #   In questo modo 1) Nessun rischio che la proxy esca dalla palla 2) L’ottimizzazione rimane stabile su uno spazio Euclideo.
@@ -54,3 +57,76 @@ class HypProxyAnchor(nn.Module):
     def get_proxies(self):
         with torch.no_grad():
             return self.projector(self.proxies_tan)
+
+
+class HypMultiProxyAnchor(nn.Module):
+    def __init__(self, n_genus,n_species, sz_embed, c=0.1, mrg=0.1, alpha=32, clip_r=2.3, riemannian=True):
+        super().__init__()
+        self.n_genus = n_genus
+        self.n_species = n_species
+
+        self.sz_embed = sz_embed
+        self.c = c
+        self.mrg = mrg
+        self.alpha = alpha
+
+        self.projector = HypProjector(c=c, riemannian=riemannian, clip_r=clip_r)
+
+        genus_proxy_init = torch.randn(n_genus, sz_embed) * 0.01
+        self.genus_proxies_tan = nn.Parameter(genus_proxy_init)
+
+        species_proxy_init = torch.randn(n_species, sz_embed) * 0.01
+        self.species_proxies_tan = nn.Parameter(species_proxy_init)
+
+
+    def forward(self, X, T_species, T_genus):
+        # Proxies
+        device=X.device
+
+        hyp_genus_proxies=self.projector(self.genus_proxies_tan.to(device=device))
+        hyp_species_proxies=self.projector(self.species_proxies_tan.to(device=device))
+
+        # ---- LOSS SPECIES ----
+        # Calcolo della matrice di distanza iperbolica tra batteri e proxies delle specie
+        dist_species = pmath.dist_matrix(X, hyp_species_proxies, self.c)  # distanza iperbolica
+
+        P_one_hot = torch.nn.functional.one_hot(T_species, num_classes=self.n_species).float()
+        N_one_hot = 1 - P_one_hot
+
+        valid_species_proxies_mask = (P_one_hot.sum(dim=0) != 0).float()  # [nb_classes]
+        num_valid_species_proxies = valid_species_proxies_mask.sum().clamp(min=1.0)
+
+        pos_species_term = torch.sum(torch.nn.functional.softplus(dist_species) * P_one_hot) / num_valid_species_proxies
+        neg_species_term = torch.sum(torch.nn.functional.softplus(-dist_species) * N_one_hot) / self.n_species
+
+        loss_species = pos_species_term + neg_species_term
+
+
+        # ---- LOSS GENUS (proxy specie ↔ proxy genere) ----
+
+        # Calcolo della matrice di distanza iperbolica tra proxies delle specie e quelle dei genera
+        dist_genus= pmath.dist_matrix(hyp_species_proxies, hyp_genus_proxies, self.c)
+
+        P_one_hot_genus = torch.nn.functional.one_hot(T_genus.to(device), num_classes=self.n_genus).float()
+        N_one_hot_genus = 1 - P_one_hot_genus
+
+        valid_genus_proxies_mask=(P_one_hot_genus.sum(dim=0) != 0).float()
+        num_valid_genus_proxies = valid_genus_proxies_mask.sum().clamp(min=1.0)
+
+        pos_genus_term=torch.sum(torch.nn.functional.softplus(dist_genus) * P_one_hot_genus) / num_valid_genus_proxies
+        neg_genus_term=torch.sum(torch.nn.functional.softplus(-dist_genus) * N_one_hot_genus) / self.n_genus
+
+        loss_genus = pos_genus_term + neg_genus_term
+
+        # ---- LOSS TOTALE ----
+        loss = loss_species + loss_genus
+        return loss
+
+
+    def get_species_proxies(self):
+        with torch.no_grad():
+            return self.projector(self.species_proxies_tan)
+
+    def get_genus_proxies(self):
+        with torch.no_grad():
+            return self.projector(self.genus_proxies_tan)
