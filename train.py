@@ -74,7 +74,7 @@ if __name__ == "__main__":
     parser.add_argument("--sketch_file", type=str, required=True, help="Path al file .sketch")
     parser.add_argument("--assembly_file", type=str, required=True, help="Path al file assembly2species2directory.tsv")
     parser.add_argument("--gallery_file", type=str, required=True, help="Path al file seen_gallery.csv")
-    parser.add_argument("--output_dir", type=str, default="output", help="Directory dove salvare il modello")
+    parser.add_argument("--output_dir", type=str, default="output_dir", help="Directory dove salvare il modello")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size per il DataLoader")
     parser.add_argument("--num_workers", type=int, default=16, help="Numero di worker per il DataLoader")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")

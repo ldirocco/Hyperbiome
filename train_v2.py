@@ -12,7 +12,7 @@ from pytorch_metric_learning.losses import ProxyAnchorLoss
 
 def main(args):
     print("Loading Seen Gallery...", flush=True)
-    seen_gallery=BacteriaSketches(args.sketch_file,args.metadata)
+    seen_gallery=BacteriaSketches(args.sketch_file,args.metadata,args.multi_proxy)
     print("Done!", flush=True)
 
     n_genera=seen_gallery.n_genera()
