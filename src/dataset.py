@@ -15,10 +15,11 @@ class BacteriaSketches(Dataset):
             path = Path(sketch['file_str'])
             file_name = path.name
             self.sample.append(file_name[:-3])
-            labels_df=pd.read_csv(labels_path, sep='\t')
-            self.genus_labels=dict(zip(labels_df["Sample"], labels_df["Genus_ID"]))
-            self.species_labels=dict(zip(labels_df["Sample"], labels_df["Species_ID"]))
-            self.return_genus=return_genus
+
+        labels_df=pd.read_csv(labels_path, sep='\t')
+        self.genus_labels=dict(zip(labels_df["Sample"], labels_df["Genus_ID"]))
+        self.species_labels=dict(zip(labels_df["Sample"], labels_df["Species_ID"]))
+        self.return_genus=return_genus
 
     def n_genera(self):
         return len(np.unique(np.array(list(self.genus_labels.values()))))
