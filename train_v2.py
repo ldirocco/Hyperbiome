@@ -18,7 +18,8 @@ def main(args):
     n_genera=seen_gallery.n_genera()
     n_species=seen_gallery.n_species()
 
-    print(f"# Genera: {n_genera}", flush=True)
+    if args.multi_proxy:
+        print(f"# Genera: {n_genera}", flush=True)
     print(f"# Species: {n_species}", flush=True)
     print(f"# Assemblies: {len(seen_gallery)}",flush=True)
 

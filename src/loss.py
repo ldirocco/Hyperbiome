@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import pandas as pd
 import src.poincare_math as pmath
 
 from src.modules import HypProjector
@@ -60,7 +61,7 @@ class HypProxyAnchor(nn.Module):
 
 
 class HypMultiProxyAnchor(nn.Module):
-    def __init__(self, n_genus,n_species, sz_embed, c=0.1, mrg=0.1, alpha=32, clip_r=2.3, riemannian=True):
+    def __init__(self, n_genus,n_species, sz_embed,metadata_path, c=0.1, mrg=0.1, alpha=32, clip_r=2.3, riemannian=True):
         super().__init__()
         self.n_genus = n_genus
         self.n_species = n_species
@@ -77,6 +78,9 @@ class HypMultiProxyAnchor(nn.Module):
 
         species_proxy_init = torch.randn(n_species, sz_embed) * 0.01
         self.species_proxies_tan = nn.Parameter(species_proxy_init)
+
+        df = pd.read_csv(metadata_path, sep="\t")
+        self.species_to_genus = dict(zip(df["Species_ID"], df["Genus_ID"]))
 
 
     def forward(self, X, T_species, T_genus):
@@ -104,10 +108,19 @@ class HypMultiProxyAnchor(nn.Module):
 
         # ---- LOSS GENUS (proxy specie ↔ proxy genere) ----
 
-        # Calcolo della matrice di distanza iperbolica tra proxies delle specie e quelle dei genera
-        dist_genus= pmath.dist_matrix(hyp_species_proxies, hyp_genus_proxies, self.c)
+        # Prendo l'insieme di specie presenti nel batch
+        unique_species, inv_idx = torch.unique(T_species, return_inverse=True)
 
-        P_one_hot_genus = torch.nn.functional.one_hot(T_genus.to(device), num_classes=self.n_genus).float()
+        #Prendo in considerazione solamente le proxy corrispondenti alle specie in unique species
+        species_proxies_unique = self.hyp_species_proxies[unique_species]
+
+        #Calcolo la distanza tra il sottoinsieme di proxies delle species e le proxy dei genera
+        dist_genus = pmath.dist_matrix(species_proxies_unique, hyp_genus_proxies, self.c)
+
+        #Per ogni specie, calcoliamo il genus corrispondente
+        genus_targets = torch.tensor([self.species_to_genus[s.item()] for s in unique_species])
+
+        P_one_hot_genus = torch.nn.functional.one_hot(genus_targets, num_classes=60).float()
         N_one_hot_genus = 1 - P_one_hot_genus
 
         valid_genus_proxies_mask=(P_one_hot_genus.sum(dim=0) != 0).float()
