@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyperbiome"
+version = "0.1.0"
+description = "CLI for training and validating embedding models"
+readme = "README.md"
+authors = [
+    {name="Your Name", email="you@example.com"}
+]
+requires-python = ">=3.8"
+dependencies = [
+    "typer[all]",
+    "rich"
+]
+
+[project.scripts]
+hyperbiome = "hyperbiome.cli:app"

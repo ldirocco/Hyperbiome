@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import pandas as pd
-import src.poincare_math as pmath
+import back.src.poincare_math as pmath
 
-from src.modules import HypProjector
+from back.src.modules import HypProjector
 
 
 

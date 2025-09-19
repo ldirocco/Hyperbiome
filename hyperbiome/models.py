@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from src.modules import HypProjector
+from hyperbiome.modules import HypProjector
 
 class TransformerEmbedder(nn.Module):
 
@@ -37,7 +37,7 @@ class TransformerEmbedder(nn.Module):
         return x
 
 class HypTransformerEmbedder(nn.Module):
-    def __init__(self, input_dim=4096, patch_size=16, dim=128, depth=4, heads=4, mlp_dim=256, c=0.1):
+    def __init__(self, input_dim=4096, patch_size=16, dim=128, depth=4, heads=4, mlp_dim=256, c=0.1,clip_r=2.3):
         super().__init__()
         self.embedder = TransformerEmbedder(
             input_dim=input_dim,
@@ -47,7 +47,8 @@ class HypTransformerEmbedder(nn.Module):
             heads=heads,
             mlp_dim=mlp_dim,
         )
-        self.projector = HypProjector(c=c, riemannian=True, clip_r=2.3)
+        self.clip_r=clip_r
+        self.projector = HypProjector(c=c, riemannian=True, clip_r=self.clip_r)
 
     def forward(self, x):
         x = self.embedder(x)

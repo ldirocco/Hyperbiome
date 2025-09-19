@@ -1,4 +1,5 @@
-import src.poincare_math as pmath
+
+import hyperbiome.poincare_math as pmath
 import torch
 
 from torch import nn
@@ -34,4 +35,3 @@ class HypProjector(nn.Module):
         x=x*fac
 
         return self.grad_fix(pmath.project(pmath.expmap0(x,c=self.c), c=self.c))
-
