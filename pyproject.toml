@@ -18,3 +18,7 @@ dependencies = [
 
 [project.scripts]
 hyperbiome = "hyperbiome.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["hyperbiome*"]
+exclude = ["back*"]

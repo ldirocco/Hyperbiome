@@ -13,9 +13,7 @@ import argparse
 
 
 def build_new_proxies(model, dataset, device, c=0.01, batch_size=128):
-   
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-
     embeddings_by_class = defaultdict(list)
 
     model.eval()
@@ -23,26 +21,19 @@ def build_new_proxies(model, dataset, device, c=0.01, batch_size=128):
         for X, y in tqdm(loader, desc="Embedding unseen_gallery"):
             X = X.float().to(device)
             y = y.to(device)
-
-            emb = model(X)  # assumiamo che emb sia in coordinate del disco di Poincare
-            # raccogli per classe (spostiamo su CPU per accumulare senza occupare VRAM)
+            emb = model(X)
             for e, label in zip(emb, y):
                 embeddings_by_class[int(label.item())].append(e.cpu())
 
     if len(embeddings_by_class) == 0:
         return torch.empty(0), []
 
-    # ordina le classi per avere ordine stabil (ascending)
     new_labels = sorted(embeddings_by_class.keys())
-
     new_proxies_list = []
     for cls in new_labels:
-        vecs = embeddings_by_class[cls]            # lista di tensori CPU [D]
+        vecs = embeddings_by_class[cls]            # [D]
         mat = torch.stack(vecs, dim=0)            # [N_cls, D]
-        # calcola la mean iperbolica: pmath.poincare_mean si aspetta punti in Poincare
-        # dim=0 riduce la riga (media su N_cls)
-        mean_p = pmath.poincare_mean(mat, dim=0, c=c)   # restituisce [D] (CPU tensor)
-        # garantiamo che il punto sia entro la palla (sicurezza numerica)
+        mean_p = pmath.poincare_mean(mat, dim=0, c=c)   # [D]
         mean_p = pmath.project(mean_p, c=c)
         new_proxies_list.append(mean_p)
 
@@ -52,22 +43,21 @@ def build_new_proxies(model, dataset, device, c=0.01, batch_size=128):
 def run_valid(model_folder, c, r, metadata_folder, sketches_folder, device):
     print(device, flush=True)
 
-    # modello
+    # model
     model_path = os.path.join(model_folder, "multi_proxy_model.pth")
     model = HypTransformerEmbedder()
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
     model.eval()
 
-    # proxies viste
+    # proxies
     proxies_path = os.path.join(model_folder, "species_proxies.pth")
     proxies_tan = torch.load(proxies_path).to(device).float()
 
-    projector = HypProjector(c=0.01, riemannian=True, clip_r=4)
+    projector = HypProjector(c=c, riemannian=True, clip_r=r)
     proxies = projector(proxies_tan)
 
     print("Loading Unseen Gallery", flush=True)
-    # unseen gallery → nuove proxies
     unseen_gallery = BacteriaSketches(
         os.path.join(sketches_folder, "unseen_gallery.sketch"),
         os.path.join(metadata_folder, "labeled_unseen_gallery.csv"),
@@ -77,12 +67,10 @@ def run_valid(model_folder, c, r, metadata_folder, sketches_folder, device):
     print("Building new proxies", flush=True)
     new_proxies, new_labels = build_new_proxies(model, unseen_gallery, device)
 
-    # aggiorna proxies
     all_proxies = torch.cat([proxies, new_proxies], dim=0)
 
 
     print("Loading Unseen Query", flush=True)
-    # unseen query da classificare
     unseen_query = BacteriaSketches(
         os.path.join(sketches_folder, "unseen_query.sketch"),
         os.path.join(metadata_folder, "labeled_unseen_query.csv"),
@@ -143,7 +131,6 @@ if __name__ == "__main__":
     else:
         device = args.device
 
-    # Chiamata alla funzione con i parametri dall'arg parser
     run_valid(
         model_folder=args.model_folder,
         c=args.c,

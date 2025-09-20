@@ -2,12 +2,16 @@ import typer
 from rich.progress import track
 from hyperbiome.train import run_train
 from hyperbiome.valid import run_valid
+from hyperbiome.hypergen import install_hypergen, run_hypergen
 
-app = typer.Typer(help="🐱 CLI for training and validating embedding models")
+app = typer.Typer(help="Hyperbiome - CLI for training and validating embedding models")
 
 # Sub-apps for training and validation
+hypergen_app = typer.Typer(help="Commands for Hyper-Gen")
+datasets_app = typer.Typer(help="Commands for download datasets")
 train_app = typer.Typer(help="Commands for training")
 valid_app = typer.Typer(help="Commands for validation")
+query_app = typer.Typer(help="Commands for running query")
 
 # Global callback
 @app.callback()
@@ -103,11 +107,44 @@ def valid(
         device=device,
     )
 
+
+@hypergen_app.command("install", help="Install HyperGen")
+def install_hypergen_app(
+        device: str = typer.Option("cpu", "--type", "-t", help="Install type: cpu or gpu"),
+        gpu_type: str = typer.Option("ampere", "--gpu", "-g", help="GPU type: ada-lovelace, ampere, volta, hopper")
+):
+    install_hypergen(device =device, gpu_type = gpu_type)
+
+@hypergen_app.command("run", help="Run HyperGen")
+def run_hypergen_app(
+        device: str = typer.Option("cpu", "--type", "-t", help="Run type: cpu or gpu"),
+        data_folder: str = typer.Option("data", "--device", help="Folder with data"),
+        output_file: str = typer.Option("fna.sketch", "--device", help="Name of output file"),
+):
+    run_hypergen(device=device, data_folder=data_folder, output_file=output_file)
+
+@datasets_app.command("allthebacteria", help="Download AllTheBacteria Original Dataset")
+def allthebacteria():
+    pass
+
+@datasets_app.command("sketches", help="Download AllTheBacteria processed Dataset with HyperGen")
+def allthebacteria_processed():
+    pass
+
+
+@query_app.command("fasta", help="Run Fasta Query")
+def fasta_query():
+    pass
+
 # -----------------------------------------
 # Attach subcommands to the main app
 # -----------------------------------------
+app.add_typer(datasets_app, name="datasets")
+app.add_typer(hypergen_app, name="hypergen")
 app.add_typer(train_app, name="train")
 app.add_typer(valid_app, name="valid")
+app.add_typer(query_app, name="query")
+
 
 # Entry point
 if __name__ == "__main__":
