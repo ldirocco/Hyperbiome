@@ -2,7 +2,6 @@ import os
 import argparse
 import csv
 
-from scipy.spatial.distance import euclidean
 from torch.utils.data import DataLoader
 
 from hyperbiome.dataset import BacteriaSketches
@@ -44,7 +43,8 @@ def run_train(train_sketch_file,
           output_dir="outputs", 
           dim=128, 
           multi_proxy=True, 
-          hyp=False, 
+          hyp=False,
+          euclidean=False,
           hyp_c=0.1, 
           clip_r=2.3, 
           batch_size=32, 
@@ -384,6 +384,7 @@ if __name__ == "__main__":
         dim=args.dim,
         multi_proxy=args.multi_proxy,
         hyp=args.hyp,
+        euclidean=args.euclidean,
         hyp_c=args.hyp_c,
         clip_r=args.clip_r,
         batch_size=args.batch_size,
