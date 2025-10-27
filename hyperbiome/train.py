@@ -1,7 +1,8 @@
 import os
 import argparse
 import csv
-import torch
+
+from scipy.spatial.distance import euclidean
 from torch.utils.data import DataLoader
 
 from hyperbiome.dataset import BacteriaSketches
@@ -114,19 +115,29 @@ def run_train(train_sketch_file,
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    # Loss
+    #########Set the Loss Function
+
     if multi_proxy:
-        print("Using Multi Proxy", flush=True)
-        proxy_loss_fn = HypMultiProxyAnchor(
-            n_genera,
-            n_species,
-            sz_embed=dim,
-            metadata_path=train_metadata,
-            c=hyp_c,
-            clip_r=clip_r,
-            mrg=0.1,
-            alpha=32,
-        )
+        if euclidean:
+            print("Using Euclidean Hierarchical Loss", flush=True)
+            proxy_loss_fn = HierarchicalProxyAnchor_Euclidean(
+                n_genera,
+                n_species,
+                sz_embed=dim,
+                metadata_path=train_metadata
+            )
+        else:
+            print("Using Multi Proxy", flush=True)
+            proxy_loss_fn = HierarchicalProxyAnchor(
+                n_genera,
+                n_species,
+                sz_embed=dim,
+                metadata_path=train_metadata,
+                c=hyp_c,
+                clip_r=clip_r,
+                mrg=0.1,
+                alpha=32,
+            )
     elif hyp:
         print("Using HypProxyAnchor loss", flush=True)
         proxy_loss_fn = HypProxyAnchor(
@@ -265,7 +276,10 @@ def run_train(train_sketch_file,
     if hyp:
         model_path = os.path.join(output_dir, "hyp_metric_model.pth")
     elif multi_proxy:
-        model_path = os.path.join(output_dir, "multi_proxy_model.pth")
+        if euclidean:
+            model_path = os.path.join(output_dir, "multi_proxy_model_euclidean.pth")
+        else:
+            model_path = os.path.join(output_dir, "multi_proxy_model.pth")
     else:
         model_path = os.path.join(output_dir, "metric_model.pth")
 
@@ -278,13 +292,21 @@ def run_train(train_sketch_file,
         proxies = proxy_loss_fn.get_proxies()
         torch.save(proxies, proxies_path)
     elif multi_proxy:
-        species_proxies_path = os.path.join(output_dir, "species_proxies.pth")
-        species_proxies = proxy_loss_fn.get_species_proxies()
-        torch.save(species_proxies, species_proxies_path)
+        if euclidean:
+            species_proxies_path = os.path.join(output_dir, "euclidean_species_proxies.pth")
+            species_proxies = proxy_loss_fn.get_species_proxies()
+            torch.save(species_proxies, species_proxies_path)
 
-        genera_proxies_path = os.path.join(output_dir, "genera_proxies.pth")
-        genera_proxies = proxy_loss_fn.get_genera_proxies()
-        torch.save(genera_proxies, genera_proxies_path)
+            genera_proxies_path = os.path.join(output_dir, "euclidean_genera_proxies.pth")
+            genera_proxies = proxy_loss_fn.get_genera_proxies()
+            torch.save(genera_proxies, genera_proxies_path)
+        else:
+            species_proxies_path = os.path.join(output_dir, "species_proxies.pth")
+            species_proxies = proxy_loss_fn.get_species_proxies()
+            torch.save(species_proxies, species_proxies_path)
+            genera_proxies_path = os.path.join(output_dir, "genera_proxies.pth")
+            genera_proxies = proxy_loss_fn.get_genera_proxies()
+            torch.save(genera_proxies, genera_proxies_path)
     else:
         proxies_path = os.path.join(output_dir, "eucl_proxies.pth")
         proxies = proxy_loss_fn.proxies.detach().cpu()
@@ -307,6 +329,7 @@ if __name__ == "__main__":
 
     # Model setup
     parser.add_argument("--dim", type=int, default=128, help="Dimensione spazio embedding")
+    parser.add_argument("--euclidean", action="store_true", help="Se presente, usa Hierarchical Proxy Anchor")
     parser.add_argument("--multi_proxy", action="store_true", help="Se presente, usa MultiProxy loss")
     parser.add_argument("--hyp", action="store_true",
                         help="Se presente, usa HypTransformerEmbedder; altrimenti TransformerEmbedder")
