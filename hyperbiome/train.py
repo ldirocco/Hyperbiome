@@ -17,7 +17,6 @@ from torch.optim.lr_scheduler import (
 from pytorch_metric_learning.losses import ProxyAnchorLoss
 
 
-
 @torch.no_grad()
 def evaluate(model, loader, loss_fn, device):
     model.eval()
@@ -258,25 +257,25 @@ if __name__ == "__main__":
     )
 
     # I/O
-    parser.add_argument("--train_sketch_file", type=str, required=True, help="Path al file .sketch")
-    parser.add_argument("--train_metadata", type=str, required=True, help="Path al file dei metadata")
-    parser.add_argument("--valid_sketch_file", type=str, required=True, help="Path al file .sketch")
-    parser.add_argument("--valid_metadata", type=str, required=True, help="Path al file dei metadata")
-    parser.add_argument("--output_dir", type=str, default="outputs", help="Directory dove salvare il modello")
+    parser.add_argument("--train-sketch-file", type=str, required=True, help="Path al file .sketch")
+    parser.add_argument("--train-metadata", type=str, required=True, help="Path al file dei metadata")
+    parser.add_argument("--valid-sketch-file", type=str, required=True, help="Path al file .sketch")
+    parser.add_argument("--valid-metadata", type=str, required=True, help="Path al file dei metadata")
+    parser.add_argument("--output-dir", type=str, default="outputs", help="Directory dove salvare il modello")
 
     # Model setup
     parser.add_argument("--dim", type=int, default=128, help="Dimensione spazio embedding")
-    parser.add_argument("--taxonomy_proxies", action="store_true", help="Se presente, usa MultiProxy loss")
+    parser.add_argument("--taxonomy-proxies", action="store_true", help="Se presente, usa MultiProxy loss")
     parser.add_argument("--hyp", action="store_true",
                         help="Se presente, usa HypTransformerEmbedder; altrimenti TransformerEmbedder")
     parser.add_argument("--c", type=float, default=0.1, help="Curvatura")
     parser.add_argument("--r", type=float, default=2.3, help="Clipping radius")
 
     # Train setup
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size per il DataLoader")
-    parser.add_argument("--num_workers", type=int, default=16, help="Numero di worker per il DataLoader")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size per il DataLoader")
+    parser.add_argument("--num-workers", type=int, default=16, help="Numero di worker per il DataLoader")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument("--num_epochs", type=int, default=20, help="Numero di epoche per l'allenamento")
+    parser.add_argument("--num-epochs", type=int, default=20, help="Numero di epoche per l'allenamento")
     parser.add_argument(
         "--scheduler",
         type=str,
@@ -286,20 +285,20 @@ if __name__ == "__main__":
     )
 
     ## ReduceLROnPlateau
-    parser.add_argument("--plateau_mode", type=str, default="min", choices=["min", "max"], help="Plateau: modalità di monitoraggio")
+    parser.add_argument("--plateau-mode", type=str, default="min", choices=["min", "max"], help="Plateau: modalità di monitoraggio")
     parser.add_argument("--factor", type=float, default=0.5, help="Plateau: fattore di riduzione LR")
     parser.add_argument("--patience", type=int, default=3, help="Plateau: epoche senza miglioramento prima della riduzione")
     parser.add_argument("--threshold", type=float, default=1e-4, help="Plateau: soglia di miglioramento")
     parser.add_argument("--cooldown", type=int, default=0, help="Plateau: cooldown dopo riduzione")
-    parser.add_argument("--min_lr", type=float, default=1e-7, help="Plateau: LR minimo")
+    parser.add_argument("--min-lr", type=float, default=1e-7, help="Plateau: LR minimo")
 
     ## StepLR
-    parser.add_argument("--step_size", type=int, default=10, help="StepLR: epoche per step")
+    parser.add_argument("--step-size", type=int, default=10, help="StepLR: epoche per step")
     parser.add_argument("--gamma", type=float, default=0.1, help="StepLR: fattore di decay")
 
     ## Early stopping
-    parser.add_argument("--early_stop_patience", type=int, default=10, help="Epoche senza miglioramento per early stopping")
-    parser.add_argument("--early_stop_min_delta", type=float, default=0.0, help="Miglioramento minimo sulla val_loss per reset della pazienza")
+    parser.add_argument("--early-stop-patience", type=int, default=10, help="Epoche senza miglioramento per early stopping")
+    parser.add_argument("--early-stop-min-delta", type=float, default=0.0, help="Miglioramento minimo sulla val_loss per reset della pazienza")
 
     parser.add_argument(
         "--device", type=str, default="", help="device"
@@ -320,8 +319,8 @@ if __name__ == "__main__":
         dim=args.dim,
         taxonomy_proxies=args.multi_proxy,
         hyp=args.hyp,
-        c=args.hyp_c,
-        r=args.clip_r,
+        c=args.c,
+        r=args.r,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         lr=args.lr,
