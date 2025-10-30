@@ -35,18 +35,16 @@ def evaluate(model, loader, loss_fn, device):
 def current_lr(optimizer):
     return optimizer.param_groups[0]["lr"]
 
-
 def run_train(train_sketch_file,
           train_metadata,
           valid_sketch_file, 
           valid_metadata, 
           output_dir="outputs", 
-          dim=128, 
-          multi_proxy=True, 
+          dim=128,
           hyp=False,
-          euclidean=False,
-          hyp_c=0.1, 
-          clip_r=2.3, 
+          taxonomy_proxies=True,
+          c=0.1,
+          r=2.3,
           batch_size=32, 
           num_workers=16, 
           lr=0.0001, 
@@ -63,18 +61,19 @@ def run_train(train_sketch_file,
           early_stop_patience=10, 
           early_stop_min_delta=0.0,
           device="cpu"):
+
     print("Loading Seen Gallery...", flush=True)
-    seen_gallery = BacteriaSketches(train_sketch_file, train_metadata, multi_proxy)
+    seen_gallery = BacteriaSketches(train_sketch_file, train_metadata, taxonomy_proxies)
     print("Done!", flush=True)
 
     print("Loading Seen Query...", flush=True)
-    seen_query = BacteriaSketches(valid_sketch_file, valid_metadata, multi_proxy)
+    seen_query = BacteriaSketches(valid_sketch_file, valid_metadata, taxonomy_proxies)
     print("Done!", flush=True)
 
     n_genera = seen_gallery.n_genera()
     n_species = seen_gallery.n_species()
 
-    if multi_proxy:
+    if taxonomy_proxies:
         print(f"# Genera: {n_genera}", flush=True)
         print(f"# Species: {n_species}", flush=True)
         print(f"# Assemblies: {len(seen_gallery)}", flush=True)
@@ -99,58 +98,38 @@ def run_train(train_sketch_file,
 
     input_dim = len(seen_gallery[0][0])
 
-    print("Model...", flush=True)
-    if hyp or multi_proxy:
-        print("Using HypTransformerEmbedder", flush=True)
+    print("Setting the Model...", flush=True)
+    if hyp:
+        print("...using Hyperbolic Transformer", flush=True)
         model = HypTransformerEmbedder(
-            input_dim=input_dim, c=hyp_c, clip_r=clip_r, dim=dim
+            input_dim=input_dim, c=c, clip_r=r, dim=dim
         )
     else:
-        print("Using TransformerEmbedder", flush=True)
+        print("...using Euclidean Transformer", flush=True)
         model = TransformerEmbedder(input_dim=input_dim, dim=dim)
 
-
+    print(f"Sending the model to {device}...", flush=True)
     model.to(device)
     print(f"Done! (device: {device})", flush=True)
-
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    #########Set the Loss Function
-
-    if multi_proxy:
-        if euclidean:
-            print("Using Euclidean Hierarchical Loss", flush=True)
-            proxy_loss_fn = HierarchicalProxyAnchor_Euclidean(
+    print("Setting the Loss...", flush=True)
+    if taxonomy_proxies:
+        if hyp:
+            print("Using Hyperbolic Taxonomic Loss (W.I.P.)", flush=True)
+        else:
+            print("Using Euclidean Taxonomic Loss", flush=True)
+            proxy_loss=HierarchicalProxyAnchor_Euclidean(
                 n_genera,
                 n_species,
                 sz_embed=dim,
                 metadata_path=train_metadata
             )
-        else:
-            print("Using Multi Proxy", flush=True)
-            proxy_loss_fn = HierarchicalProxyAnchor(
-                n_genera,
-                n_species,
-                sz_embed=dim,
-                metadata_path=train_metadata,
-                c=hyp_c,
-                clip_r=clip_r,
-                mrg=0.1,
-                alpha=32,
-            )
-    elif hyp:
-        print("Using HypProxyAnchor loss", flush=True)
-        proxy_loss_fn = HypProxyAnchor(
-            n_species,
-            sz_embed=dim,
-            c=hyp_c,
-            clip_r=clip_r,
-            mrg=0.1,
-            alpha=32,
-        )
     else:
-        print("Using standard ProxyAnchorLoss", flush=True)
-        proxy_loss_fn = ProxyAnchorLoss(n_species, dim, margin=0.1, alpha=32)
+        if hyp:
+            print("Using Hyperbolic Proxy-Anchor Loss (W.I.P.)", flush=True)
+        else:
+            print("Using Proxy-Anchor Loss", flush=True)
 
     # Scheduler
     if scheduler == "none":
@@ -187,14 +166,14 @@ def run_train(train_sketch_file,
     epochs_no_improve = 0
     best_model_path = os.path.join(output_dir, "best_model.pth")
 
-    if multi_proxy:
+    if taxonomy_proxies:
         for epoch in range(num_epochs):
             # Training
             train_loss = train_multiproxy_model(
-                model, train_loader, optimizer, proxy_loss_fn, device
+                model, train_loader, optimizer, proxy_loss, device
             )
             # Validation
-            val_loss = evaluate(model, valid_loader, proxy_loss_fn, device)
+            val_loss = evaluate(model, valid_loader, proxy_loss, device)
 
             # Logging
             print(
@@ -221,8 +200,8 @@ def run_train(train_sketch_file,
                 # Salva anche i proxies migliori
                 species_proxies_path = os.path.join(output_dir, "best_species_proxies.pth")
                 genera_proxies_path = os.path.join(output_dir, "best_genera_proxies.pth")
-                species_proxies = proxy_loss_fn.get_species_proxies()
-                genera_proxies = proxy_loss_fn.get_genera_proxies()
+                species_proxies = proxy_loss.get_species_proxies()
+                genera_proxies = proxy_loss.get_genera_proxies()
                 torch.save(species_proxies, species_proxies_path)
                 torch.save(genera_proxies, genera_proxies_path)
                 print(f"Best model aggiornato (val_loss={best_val:.4f})", flush=True)
@@ -232,85 +211,43 @@ def run_train(train_sketch_file,
                     print(f"Early stopping dopo {epoch + 1} epoche (best val_loss={best_val:.4f})", flush=True)
                     break
     else:
-        for epoch in range(num_epochs):
-            # Training
-            train_loss = train_model(
-                model, train_loader, optimizer, proxy_loss_fn, device
-            )
-            # Validation
-            val_loss = evaluate(model, valid_loader, proxy_loss_fn, device)
+        print("W.I.P.", flush=True)
 
-            # Logging
-            print(
-                f"Epoch {epoch + 1}/{num_epochs}: train_loss={train_loss:.4f} | val_loss={val_loss:.4f} | lr={current_lr(optimizer):.2e}",
-                flush=True,
-            )
-            with open(metrics_path, "a", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([epoch + 1, f"{train_loss:.6f}", f"{val_loss:.6f}", f"{current_lr(optimizer):.6e}"])
-
-            # Scheduler step (usa val_loss per plateau)
-            if scheduler is not None:
-                if scheduler == "plateau":
-                    scheduler.step(val_loss)
-                elif scheduler in ("step",):
-                    scheduler.step()
-
-            # Early stopping + save best
-            if val_loss < best_val - early_stop_min_delta:
-                best_val = val_loss
-                epochs_no_improve = 0
-                torch.save(model.state_dict(), best_model_path)
-                # Salva proxies migliori
-                best_proxies_path = os.path.join(output_dir, "best_proxies.pth")
-                proxies = proxy_loss_fn.proxies.detach().cpu()
-                torch.save(proxies, best_proxies_path)
-                print(f"Best model aggiornato (val_loss={best_val:.4f})", flush=True)
-            else:
-                epochs_no_improve += 1
-                if epochs_no_improve >= early_stop_patience:
-                    print(f"Early stopping dopo {epoch + 1} epoche (best val_loss={best_val:.4f})", flush=True)
-                    break
-
-    # Salvataggi finali (ultimo stato addestrato)
     if hyp:
-        model_path = os.path.join(output_dir, "hyp_metric_model.pth")
-    elif multi_proxy:
-        if euclidean:
-            model_path = os.path.join(output_dir, "multi_proxy_model_euclidean.pth")
+        if taxonomy_proxies:
+            model_path = os.path.join(output_dir, "hyp_tax_metric_model.pth")
+            species_proxies_path = os.path.join(output_dir, "hyp_species_proxies.pth")
+            species_proxies = proxy_loss.get_species_proxies()
+            torch.save(species_proxies, species_proxies_path)
+
+            genera_proxies_path = os.path.join(output_dir, "hyp_genera_proxies.pth")
+            genera_proxies = proxy_loss.get_genera_proxies()
+            torch.save(genera_proxies, genera_proxies_path)
         else:
-            model_path = os.path.join(output_dir, "multi_proxy_model.pth")
+            model_path = os.path.join(output_dir, "hyp_metric_model.pth")
+            proxies_path = os.path.join(output_dir, "hyp_proxies.pth")
+            proxies = proxy_loss.get_proxies()
+            torch.save(proxies, proxies_path)
     else:
-        model_path = os.path.join(output_dir, "metric_model.pth")
+        if taxonomy_proxies:
+            model_path = os.path.join(output_dir, "eucl_tax_metric_model.pth")
+            species_proxies_path = os.path.join(output_dir, "eucl_species_proxies.pth")
+            species_proxies = proxy_loss.get_species_proxies()
+            torch.save(species_proxies, species_proxies_path)
+
+            genera_proxies_path = os.path.join(output_dir, "eucl_genera_proxies.pth")
+            genera_proxies = proxy_loss.get_genera_proxies()
+            torch.save(genera_proxies, genera_proxies_path)
+        else:
+            model_path = os.path.join(output_dir, "eucl_metric_model.pth")
+            proxies_path = os.path.join(output_dir, "eucl_proxies.pth")
+            proxies = proxy_loss.get_proxies()
+            torch.save(proxies, proxies_path)
 
     model.to("cpu")
     torch.save(model.state_dict(), model_path)
     print(f"Modello salvato in {model_path}", flush=True)
 
-    if hyp:
-        proxies_path = os.path.join(output_dir, "hyp_proxies.pth")
-        proxies = proxy_loss_fn.get_proxies()
-        torch.save(proxies, proxies_path)
-    elif multi_proxy:
-        if euclidean:
-            species_proxies_path = os.path.join(output_dir, "euclidean_species_proxies.pth")
-            species_proxies = proxy_loss_fn.get_species_proxies()
-            torch.save(species_proxies, species_proxies_path)
-
-            genera_proxies_path = os.path.join(output_dir, "euclidean_genera_proxies.pth")
-            genera_proxies = proxy_loss_fn.get_genera_proxies()
-            torch.save(genera_proxies, genera_proxies_path)
-        else:
-            species_proxies_path = os.path.join(output_dir, "species_proxies.pth")
-            species_proxies = proxy_loss_fn.get_species_proxies()
-            torch.save(species_proxies, species_proxies_path)
-            genera_proxies_path = os.path.join(output_dir, "genera_proxies.pth")
-            genera_proxies = proxy_loss_fn.get_genera_proxies()
-            torch.save(genera_proxies, genera_proxies_path)
-    else:
-        proxies_path = os.path.join(output_dir, "eucl_proxies.pth")
-        proxies = proxy_loss_fn.proxies.detach().cpu()
-        torch.save(proxies, proxies_path)
 
     print("Done!!!", flush=True)
 
@@ -329,12 +266,11 @@ if __name__ == "__main__":
 
     # Model setup
     parser.add_argument("--dim", type=int, default=128, help="Dimensione spazio embedding")
-    parser.add_argument("--euclidean", action="store_true", help="Se presente, usa Hierarchical Proxy Anchor")
-    parser.add_argument("--multi_proxy", action="store_true", help="Se presente, usa MultiProxy loss")
+    parser.add_argument("--taxonomy_proxies", action="store_true", help="Se presente, usa MultiProxy loss")
     parser.add_argument("--hyp", action="store_true",
                         help="Se presente, usa HypTransformerEmbedder; altrimenti TransformerEmbedder")
-    parser.add_argument("--hyp_c", type=float, default=0.1, help="Curvatura")
-    parser.add_argument("--clip_r", type=float, default=2.3, help="Clipping radius")
+    parser.add_argument("--c", type=float, default=0.1, help="Curvatura")
+    parser.add_argument("--r", type=float, default=2.3, help="Clipping radius")
 
     # Train setup
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size per il DataLoader")
@@ -382,11 +318,10 @@ if __name__ == "__main__":
         valid_metadata=args.valid_metadata,
         output_dir=args.output_dir,
         dim=args.dim,
-        multi_proxy=args.multi_proxy,
+        taxonomy_proxies=args.multi_proxy,
         hyp=args.hyp,
-        euclidean=args.euclidean,
-        hyp_c=args.hyp_c,
-        clip_r=args.clip_r,
+        c=args.hyp_c,
+        r=args.clip_r,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         lr=args.lr,
