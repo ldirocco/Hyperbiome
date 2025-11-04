@@ -25,7 +25,7 @@ def evaluate(model, loader, loss_fn, device):
     for x, y_species, y_genus in loader:
         x, y_species, y_genus = x.to(device), y_species.to(device), y_genus.to(device)
         emb = model(x)
-        loss = loss_fn(emb, y_species)
+        loss = loss_fn(emb, y_species,y_genus)
         total_loss += float(loss.detach().cpu())
         n_batches += 1
     return total_loss / len(loader)

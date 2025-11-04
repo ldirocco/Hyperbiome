@@ -57,7 +57,7 @@ class HypProxyAnchor(nn.Module):
 
 
 class HierarchicalProxyAnchor(nn.Module):
-    def __init__(self, n_genus,n_species, sz_embed,metadata_path, c=0.1, alpha=32, clip_r=2.3, riemannian=True):
+    def __init__(self, n_genus,n_species, sz_embed,metadata_path=None, c=0.1, alpha=32, clip_r=2.3, riemannian=True):
         super().__init__()
         self.n_genus = n_genus
         self.n_species = n_species
@@ -74,8 +74,9 @@ class HierarchicalProxyAnchor(nn.Module):
         species_proxy_init = torch.randn(n_species, sz_embed) * 0.01
         self.species_proxies_tan = nn.Parameter(species_proxy_init)
 
-        df = pd.read_csv(metadata_path, sep="\t")
-        self.species_to_genus = dict(zip(df["Species_ID"], df["Genus_ID"]))
+        if metadata_path is not None:
+            df = pd.read_csv(metadata_path, sep="\t")
+            self.species_to_genus = dict(zip(df["Species_ID"], df["Genus_ID"]))
 
 
     def forward(self, X, T_species, T_genus):
@@ -104,7 +105,7 @@ class HierarchicalProxyAnchor(nn.Module):
         # ---- LOSS GENUS (proxy specie ↔ proxy genere) ----
 
         # Prendo l'insieme di specie presenti nel batch
-        unique_species, inv_idx = torch.unique(T_species, return_inverse=True)
+        unique_species, species_index = torch.unique(T_species, return_inverse=True)
         
         #Prendo in considerazione solamente le proxy corrispondenti alle specie in unique species
         species_proxies_unique = hyp_species_proxies[unique_species]
@@ -113,7 +114,8 @@ class HierarchicalProxyAnchor(nn.Module):
         dist_genus = pmath.dist_matrix(species_proxies_unique, hyp_genus_proxies, self.c)
         
         #Per ogni specie, calcoliamo il genus corrispondente
-        genus_targets = torch.tensor([self.species_to_genus[s.item()] for s in unique_species],device=device)
+        #genus_targets = torch.tensor(T_genus[species_index],device=device)
+        genus_targets = torch.tensor([T_genus[T_species == s][0].item() for s in unique_species], device=device)
 
         P_one_hot_genus = torch.nn.functional.one_hot(genus_targets, num_classes=self.n_genus).float()
         N_one_hot_genus = 1 - P_one_hot_genus

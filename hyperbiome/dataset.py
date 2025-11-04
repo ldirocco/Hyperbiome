@@ -1,9 +1,11 @@
 import torch
+from pandas.core.common import random_state
 from torch.utils.data import Dataset
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from .utils import read_file_sketch, decompress_hd_sketch
+from .utils import read_file_sketch, decompress_hd_sketch, read_file_sketch_optuna
+
 
 class BacteriaSketches(Dataset):
     def __init__(self, sketch_path, labels_path, return_genus=True):
@@ -88,3 +90,47 @@ class SketchDataset(Dataset):
         label = self.labels[sample]
 
         return torch.tensor(hv) / 255.0, torch.tensor(label, dtype=torch.long)
+
+
+class BacteriaSketches_optuna(Dataset):
+    def __init__(self, sketch_path, labels_path,s=200, return_genus=True):
+        with open(sketch_path, 'rb') as f:
+            self.sketches = read_file_sketch_optuna(f)
+
+
+        labels_df=pd.read_csv(labels_path, sep='\t')
+
+        labels_df=(labels_df.groupby("Species_ID",group_keys=False)
+                   .apply(lambda x: x.sample(n=s, random_state=123)).reset_index(drop=True))
+
+        self.labels_df=labels_df
+        self.return_genus=return_genus
+        self.n_species=len(np.unique(labels_df["Species_ID"]))
+        self.n_genera=len(np.unique(labels_df["Genus_ID"]))
+
+
+    def n_genera(self):
+        return self.n_genera
+
+    def n_species(self):
+        return self.n_species
+
+    def __len__(self):
+        return len(self.labels_df)
+
+    def __getitem__(self, idx):
+
+        row = self.labels_df.iloc[idx]
+        sketch = self.sketches[row.Sample+".fa"]
+        path = Path(sketch['file_str'])
+
+        hv = decompress_hd_sketch(sketch)
+        hv = torch.tensor(hv, dtype=torch.float32) / 255.0
+
+        species_id = torch.tensor(row.Species_ID, dtype=torch.long)
+
+        if self.return_genus:
+            genus_id = torch.tensor(row.Genus_ID, dtype=torch.long)
+            return hv, species_id, genus_id
+        else:
+            return hv, species_id

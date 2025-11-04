@@ -1,3 +1,5 @@
+import os.path
+
 import pandas as pd
 import pickle
 import re
@@ -121,3 +123,38 @@ def read_sketch(f):
 def read_file_sketch(f):
     length = read_u64(f)
     return [read_sketch(f) for _ in range(length)]
+
+
+def read_sketch_optuna(f):
+    ksize = read_u8(f)
+    scaled = read_u64(f)
+    canonical = read_bool(f)
+    seed = read_u64(f)
+    hv_d = read_usize(f)
+    hv_quant_bits = read_u8(f)
+    hv_norm_2 = read_i32(f)
+    file_str = read_string(f)
+    hv = read_vec_i16(f)
+
+    return os.path.basename(file_str), {
+        "file_str": file_str,
+        'ksize': ksize,
+        'scaled': scaled,
+        'canonical': canonical,
+        'seed': seed,
+        'hv_d': hv_d,
+        'hv_quant_bits': hv_quant_bits,
+        'hv_norm_2': hv_norm_2,
+        'hv': hv,
+    }
+
+
+def read_file_sketch_optuna(f):
+    length = read_u64(f)
+    out={}
+
+    for _ in range(length):
+        file_string,sketch=read_sketch_optuna(f)
+        out[file_string]=sketch
+
+    return out
